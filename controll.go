@@ -29,11 +29,14 @@ func (c *Client) InjectText(text string) error {
 	}
 
 	var buf bytes.Buffer
-	if err := buf.WriteByte(byte(CtrlInjectText)); err != nil {
+
+	err := buf.WriteByte(byte(CtrlInjectText))
+	if err != nil {
 		return fmt.Errorf("inject text type: %w", err)
 	}
 
-	if err := binary.Write(&buf, binary.BigEndian, uint16(len(text))); err != nil {
+	err = binary.Write(&buf, binary.BigEndian, uint16(len(text)))
+	if err != nil {
 		return fmt.Errorf("inject text length: %w", err)
 	}
 
@@ -137,11 +140,14 @@ func (c *Client) SetClipboard(text string, paste bool) error {
 	}
 
 	var buf bytes.Buffer
-	if err := buf.WriteByte(byte(CtrlSetClipboard)); err != nil {
+
+	err := buf.WriteByte(byte(CtrlSetClipboard))
+	if err != nil {
 		return fmt.Errorf("clipboard type: %w", err)
 	}
 
-	if err := binary.Write(&buf, binary.BigEndian, uint16(len(text))); err != nil {
+	err = binary.Write(&buf, binary.BigEndian, uint16(len(text)))
+	if err != nil {
 		return fmt.Errorf("clipboard length: %w", err)
 	}
 

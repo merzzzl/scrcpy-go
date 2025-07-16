@@ -1,9 +1,11 @@
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
     - depguard
     - dupl
     - lll
+    - wsl
     - varnamelen
     - exhaustruct
     - cyclop
@@ -18,89 +20,78 @@ linters:
     - nestif
     - goconst
     - bodyclose
+    - noinlineerr
     - forbidigo
     - zerologlint
     - ireturn
     - exhaustive
-    - exportloopref
     - mnd
-linters-settings:
-  gosec:
-    confidence: high
-    severity: high
-    excludes:
-      - G404
-  perfsprint:
-    strconcat: false
-  unused:
-    local-variables-are-used: false
-  nakedret:
-    max-func-lines: 0
-  govet:
-    enable-all: true
-    disable:
-      - shadow
-      - fieldalignment
-  gofmt:
-    rewrite-rules:
-      - pattern: "interface{}"
-        replacement: "any"
-      - pattern: "a[b:len(a)]"
-        replacement: "a[b:]"
-      - pattern: "a[0:b]"
-        replacement: "a[:b]"
-  errorlint:
-    asserts: false
-  revive:
-    enable-all-rules: true
-    rules:
-      - name: line-length-limit
-        disabled: true
-      - name: comment-spacings
-        disabled: true
-      - name: struct-tag
-        arguments:
-          - json,inline
-      - name: add-constant
-        disabled: true
-      - name: cognitive-complexity
-        disabled: true
-      - name: max-public-structs
-        disabled: true
-      - name: function-length
-        disabled: true
-      - name: cyclomatic
-        disabled: true
-      - name: confusing-results
-        disabled: true
-      - name: function-result-limit
-        disabled: true
-      - name: flag-parameter
-        disabled: true
-      - name: nested-structs
-        disabled: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-      - experimental
-    disabled-checks:
-      - unnamedResult
-  gofumpt:
-    extra-rules: true
-  testifylint:
-    enable-all: true
-  tagliatelle:
-    case:
+  settings:
+    gosec:
+      confidence: high
+      severity: high
+      excludes:
+        - G404
+    perfsprint:
+      strconcat: false
+    unused:
+      local-variables-are-used: false
+    nakedret:
+      max-func-lines: 0
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+        - fieldalignment
+    errorlint:
+      asserts: false
+    revive:
+      enable-all-rules: true
       rules:
-        json: goCamel
-        yaml: goCamel
+        - name: line-length-limit
+          disabled: true
+        - name: comment-spacings
+          disabled: true
+        - name: add-constant
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: confusing-results
+          disabled: true
+        - name: function-result-limit
+          disabled: true
+        - name: flag-parameter
+          disabled: true
+        - name: nested-structs
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: exported # temp
+          disabled: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+      disabled-checks:
+        - unnamedResult
+    testifylint:
+      enable-all: true
+    tagliatelle:
+      case:
+        rules:
+          json: goCamel
+          yaml: goCamel
 run:
   allow-parallel-runners: true
   go: "1.23"
-output:
-  sort-results: true
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

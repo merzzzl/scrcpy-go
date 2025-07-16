@@ -33,7 +33,8 @@ func main() {
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		if err := dec.Looper(egctx); err != nil {
+		err := dec.Looper(egctx)
+		if err != nil {
 			return fmt.Errorf("decoder looper: %w", err)
 		}
 
@@ -41,7 +42,8 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		if err := client.Run(egctx); err != nil {
+		err := client.Run(egctx)
+		if err != nil {
 			return fmt.Errorf("scrcpy client: %w", err)
 		}
 
@@ -52,7 +54,8 @@ func main() {
 		defer cancel()
 		defer dec.Close()
 
-		if err := AppUI(egctx, client, dec); err != nil {
+		err := AppUI(egctx, client, dec)
+		if err != nil {
 			return fmt.Errorf("ui: %w", err)
 		}
 
