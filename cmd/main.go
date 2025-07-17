@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	client, err := scrcpy.New("127.0.0.1:5555")
+	client, err := scrcpy.New("127.0.0.1:10000")
 	if err != nil {
 		log.Printf("connect: %v", err)
 

@@ -45,5 +45,5 @@ build:
 
 run:
 	$(ADB) push out/scrcpy-server /data/local/tmp/scrcpy-server.jar
-	$(ADB) forward tcp:5555 localabstract:scrcpy
+	$(ADB) forward tcp:10000 localabstract:scrcpy
 	$(ADB) shell CLASSPATH=/data/local/tmp/scrcpy-server.jar   app_process / com.genymobile.scrcpy.Server 1.20  debug 0 100000 0 -1 true - false true 0 false true - - false
