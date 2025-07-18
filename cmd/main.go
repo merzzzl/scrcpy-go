@@ -11,12 +11,17 @@ import (
 )
 
 func main() {
-	client, err := scrcpy.New("127.0.0.1:10000")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	client, err := scrcpy.Dial(ctx, "127.0.0.1:10000")
 	if err != nil {
 		log.Printf("connect: %v", err)
 
 		return
 	}
+
+	device := client.GetHandshake()
+	log.Printf("Connected to %s (%dx%d, codec=%d)\n", device.DeviceName, device.Width, device.Height, device.CodecID)
 
 	dec, err := NewDecoder()
 	if err != nil {
@@ -29,7 +34,6 @@ func main() {
 		_ = dec.Decode(frame)
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
@@ -42,7 +46,7 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		err := client.Run(egctx)
+		err := client.Serve(egctx)
 		if err != nil {
 			return fmt.Errorf("scrcpy client: %w", err)
 		}

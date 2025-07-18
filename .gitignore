@@ -1,3 +1,5 @@
 .DS_Store
-server/android-sdk
-server/out
+/android-sdk
+/build
+/scrcpy
+/commandlinetools-*

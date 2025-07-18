@@ -1,20 +1,32 @@
 package scrcpy
 
 type ControlMessageType byte
+type DeviceMessageType byte
 
 const (
-	CtrlInjectKeycode           ControlMessageType = 0
-	CtrlInjectText              ControlMessageType = 1
-	CtrlInjectTouchEvent        ControlMessageType = 2
-	CtrlInjectScrollEvent       ControlMessageType = 3
-	CtrlBackOrScreenOn          ControlMessageType = 4
-	CtrlExpandNotificationPanel ControlMessageType = 5
-	CtrlExpandSettingsPanel     ControlMessageType = 6
-	CtrlCollapsePanels          ControlMessageType = 7
-	CtrlGetClipboard            ControlMessageType = 8
-	CtrlSetClipboard            ControlMessageType = 9
-	CtrlSetScreenPowerMode      ControlMessageType = 10
-	CtrlRotateDevice            ControlMessageType = 11
+	CtrlInjectKeycode            ControlMessageType = 0
+	CtrlInjectText               ControlMessageType = 1
+	CtrlInjectTouchEvent         ControlMessageType = 2
+	CtrlInjectScrollEvent        ControlMessageType = 3
+	CtrlBackOrScreenOn           ControlMessageType = 4
+	CtrlExpandNotificationPanel  ControlMessageType = 5
+	CtrlExpandSettingsPanel      ControlMessageType = 6
+	CtrlCollapsePanels           ControlMessageType = 7
+	CtrlGetClipboard             ControlMessageType = 8
+	CtrlSetClipboard             ControlMessageType = 9
+	CtrlSetDisplayPower          ControlMessageType = 10
+	CtrlRotateDevice             ControlMessageType = 11
+	CtrlUhidCreate               ControlMessageType = 12
+	CtrlUhidInput                ControlMessageType = 13
+	CtrlUhidDestroy              ControlMessageType = 14
+	CtrlOpenHardKeyboardSettings ControlMessageType = 15
+	CtrlStartApp                 ControlMessageType = 16
+)
+
+const (
+	DeviceClipboard    DeviceMessageType = 0
+	DeviceAckClipboard DeviceMessageType = 1
+	DeviceUhidOutput   DeviceMessageType = 2
 )
 
 const (
@@ -29,17 +41,29 @@ const (
 )
 
 const (
-	lenHandshake     = 65
-	lenInjectKeycode = 14
-	lenInjectTouch   = 28
-	lenInjectScroll  = 21
+	lenInjectKeycode = 1 + 1 + 4 + 4 + 4
+	lenInjectTouch   = 1 + 1 + 8 + 4 + 4 + 2 + 2 + 2 + 4 + 4
+	lenInjectScroll  = 1 + 4 + 4 + 2 + 2 + 2 + 2 + 4
+	maxTextLength    = 300
+	maxClipLength    = (1<<18 - 14)
 )
 
-const maxTextLength = 65535
+const (
+	dummyLen       = 1
+	deviceNameLen  = 64
+	videoHeaderLen = 12
+	frameHeaderLen = 12
+)
 
 const (
-	videoFrame   = 65536
-	controlFrame = 4096
+	ButtonNone            = 0
+	ButtonPrimary         = 1 << 0
+	ButtonSecondary       = 1 << 1
+	ButtonTertiary        = 1 << 2
+	ButtonBack            = 1 << 3
+	ButtonForward         = 1 << 4
+	ButtonStylusPrimary   = 1 << 5
+	ButtonStylusSecondary = 1 << 6
 )
 
 const (
