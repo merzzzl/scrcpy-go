@@ -1,6 +1,6 @@
 # scrcpy-go
 
-`scrcpy-go` is a simple, lightweight Go client/wrapper for [scrcpy 1.20](https://github.com/Genymobile/scrcpy/tree/v1.20).  
+`scrcpy-go` is a simple, lightweight Go client/wrapper for [scrcpy v3.3.1](https://github.com/Genymobile/scrcpy/tree/v1.20).  
 It supports sending control commands and receiving H.264 video stream from Android devices.
 
 ## Features
@@ -19,6 +19,11 @@ It supports sending control commands and receiving H.264 video stream from Andro
   - **Set Clipboard** — copy text to device clipboard
   - **Set Screen Power Mode** — turn screen on/off
   - **Rotate Device** — request device to rotate screen
+  - **Create UHID Device** — create virtual HID input device (e.g. mouse, keyboard)
+  - **Send UHID Input** — send HID report to virtual device
+  - **Destroy UHID Device** — remove previously created virtual HID device
+  - **Open Hard Keyboard Settings** — open system hardware keyboard settings screen
+  - **Start App** — start an Android application by package name
 
 - Decodes and displays H.264 video stream
 - Connects via TCP to the scrcpy server running on the Android device
