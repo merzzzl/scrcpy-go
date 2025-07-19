@@ -12,8 +12,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type VideoHandler func(frame []byte)
-type ControlHandler func(ControlMessage)
+type VideoHandler func(io.Reader) error
+type ControlHandler func(context.Context, ControlMessage) error
 
 type ControlMessage struct {
 	Type    DeviceMessageType
@@ -77,7 +77,7 @@ func Dial(ctx context.Context, addr string) (*Client, error) {
 	}
 
 	hs := Handshake{
-		DeviceName: string(nameRaw[:trimZero(nameRaw)]),
+		DeviceName: string(nameRaw),
 		CodecID:    binary.BigEndian.Uint32(meta[:4]),
 		Width:      binary.BigEndian.Uint32(meta[4:8]),
 		Height:     binary.BigEndian.Uint32(meta[8:12]),
@@ -97,70 +97,99 @@ func (c *Client) SetControlHandler(h ControlHandler) { c.controlHandler = h }
 func (c *Client) GetHandshake() Handshake { return c.handshake }
 
 func (c *Client) Serve(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	eg, gctx := errgroup.WithContext(ctx)
+	gctx, cancel := context.WithCancel(gctx)
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		defer cancel()
 
-	eg.Go(func() error { return c.readVideo(ctx) })
-	eg.Go(func() error { return c.readControl(ctx) })
+		return c.readVideo(gctx)
+	})
+
+	eg.Go(func() error {
+		defer cancel()
+
+		return c.readControl(gctx)
+	})
 
 	return eg.Wait()
 }
 
 func (c *Client) readVideo(ctx context.Context) error {
-	for ctx.Err() == nil {
-		hdr := make([]byte, frameHeaderLen)
-		if err := readWithDeadline(c.videoConn, hdr); err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+	hdr := make([]byte, 12)
+	pr, pw := io.Pipe()
+	eg, gctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		if c.videoHandler == nil {
+			return nil
+		}
+
+		if err := c.videoHandler(pr); err != nil {
+			return fmt.Errorf("video handler: %w", err)
+		}
+
+		return nil
+	})
+
+	eg.Go(func() error {
+		for gctx.Err() == nil {
+			if err := readWithDeadline(c.videoConn, hdr); err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue
+				}
+
+				return fmt.Errorf("read video header: %w", err)
+			}
+
+			size := binary.BigEndian.Uint32(hdr[8:12])
+			if size == 0 {
 				continue
 			}
 
-			return err
+			if _, err := io.CopyN(pw, c.videoConn, int64(size)); err != nil {
+				return fmt.Errorf("read video: %w", err)
+			}
 		}
 
-		size := binary.BigEndian.Uint32(hdr[8:12])
-		if size == 0 {
-			continue
-		}
+		return nil
+	})
 
-		payload := make([]byte, size)
+	eg.Go(func() error {
+		<-gctx.Done()
 
-		if err := readWithDeadline(c.videoConn, payload); err != nil {
-			return err
-		}
+		return errors.Join(pw.Close(), pr.Close())
+	})
 
-		if c.videoHandler != nil {
-			c.videoHandler(payload)
-		}
-	}
-
-	return nil
+	return eg.Wait()
 }
 
 func (c *Client) readControl(ctx context.Context) error {
 	for ctx.Err() == nil {
 		header := make([]byte, 1)
+
 		if err := readWithDeadline(c.controlConn, header); err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
 			}
 
-			return err
+			return fmt.Errorf("read control header: %w", err)
 		}
 
 		buf := make([]byte, 4096)
 
 		n, err := c.controlConn.Read(buf)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return err
+			return fmt.Errorf("read control: %w", err)
 		}
 
 		if c.controlHandler != nil {
-			c.controlHandler(ControlMessage{
+			if err := c.controlHandler(ctx, ControlMessage{
 				Type:    DeviceMessageType(header[0]),
 				Payload: append([]byte(nil), buf[:n]...),
-			})
+			}); err != nil {
+				return fmt.Errorf("control handler: %w", err)
+			}
 		}
 	}
 
@@ -181,14 +210,4 @@ func readExactly(r io.Reader, n int, buf []byte) error {
 	_, err := io.ReadFull(r, buf)
 
 	return err
-}
-
-func trimZero(b []byte) int {
-	for i, v := range b {
-		if v == 0 {
-			return i
-		}
-	}
-
-	return len(b)
 }

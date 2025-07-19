@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"image"
-	"sync/atomic"
-	"time"
+	"io"
+	"sync"
 
 	"github.com/gdamore/tcell/v2"
 	scrcpy "github.com/merzzzl/scrcpy-go"
@@ -13,16 +12,14 @@ import (
 )
 
 type StateUI struct {
-	screenX      atomic.Uint32
-	screenY      atomic.Uint32
-	client       *scrcpy.Client
-	screen       tcell.Screen
-	endOfScreenY atomic.Uint32
-
-	primaryKeyPressed bool
+	mutex  sync.Mutex
+	client *scrcpy.Client
+	screen tcell.Screen
+	width  int
+	height int
 }
 
-func AppUI(ctx context.Context, client *scrcpy.Client, decoder *Decoder) error {
+func AppUI(ctx context.Context, client *scrcpy.Client, decoder *scrcpy.FFmpeg) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -39,28 +36,34 @@ func AppUI(ctx context.Context, client *scrcpy.Client, decoder *Decoder) error {
 
 	screen.EnableMouse()
 
+	hs := client.GetHandshake()
+
 	state := StateUI{
 		client: client,
 		screen: screen,
+		width:  int(hs.Width),
+		height: int(hs.Height),
 	}
 
 	go func() {
-		for ctx.Err() == nil {
-			img := decoder.Image()
+		buf := make([]byte, state.width*state.height*3)
 
-			state.img2tcell(img)
-			time.Sleep(25 * time.Millisecond)
+		for ctx.Err() == nil {
+			if _, err := io.ReadFull(decoder, buf); err != nil {
+				return
+			}
+
+			go state.img2tcell(buf)
 		}
 	}()
 
 	state.eventsHandler(ctx)
-	cancel()
 
 	return nil
 }
 
 func (s *StateUI) eventsHandler(ctx context.Context) {
-	waitCommand := false
+	var primaryKeyPressed bool
 
 	for ctx.Err() == nil {
 		ev := s.screen.PollEvent()
@@ -71,52 +74,16 @@ func (s *StateUI) eventsHandler(ctx context.Context) {
 			if ev.Key() == tcell.KeyEscape || ev.Rune() == 'q' {
 				return
 			}
-
-			if ev.Key() == tcell.KeyETX {
-				waitCommand = true
-
-				continue
-			}
-
-			if !waitCommand {
-				continue
-			}
-
-			waitCommand = false
-
-			if ev.Rune() == 'n' {
-				_ = s.client.ExpandNotificationPanel()
-			}
-
-			if ev.Rune() == 's' {
-				_ = s.client.ExpandSettingsPanel()
-			}
-
-			if ev.Rune() == 'p' {
-				_ = s.client.CollapsePanels()
-			}
-
-			if ev.Rune() == 'b' {
-				_ = s.client.BackOrScreenOn(scrcpy.ActionDown)
-				_ = s.client.BackOrScreenOn(scrcpy.ActionUp)
-			}
-
-			if ev.Rune() == 'r' {
-				_ = s.client.RotateDevice()
-			}
-
-			s.event2tcell(fmt.Sprintf("Key: %v, Rune: %q, Modifiers: %v\n", ev.Key(), ev.Rune(), ev.Modifiers()))
-
 		case *tcell.EventMouse:
 			w, h := s.screen.Size()
 			x, y := ev.Position()
 
-			rx := uint32(float32(s.screenX.Load()) / float32(w) * float32(x))
-			ry := uint32(float32(s.screenY.Load()) / float32(h) * float32(y))
+			rx := uint32(float32(s.width) / float32(w) * float32(x))
+			ry := uint32(float32(s.height) / float32(h) * float32(y))
 
 			if ev.Buttons() == tcell.Button1 {
-				if !s.primaryKeyPressed {
-					s.primaryKeyPressed = true
+				if !primaryKeyPressed {
+					primaryKeyPressed = true
 					_ = s.client.InjectTouch(scrcpy.ActionDown, 1, rx, ry, 65535, scrcpy.ButtonPrimary, scrcpy.ButtonPrimary)
 				} else {
 					_ = s.client.InjectTouch(scrcpy.ActionMove, 1, rx, ry, 65535, 0, scrcpy.ButtonPrimary)
@@ -125,20 +92,35 @@ func (s *StateUI) eventsHandler(ctx context.Context) {
 				continue
 			}
 
-			if s.primaryKeyPressed {
-				s.primaryKeyPressed = false
+			if primaryKeyPressed {
+				primaryKeyPressed = false
 				_ = s.client.InjectTouch(scrcpy.ActionUp, 1, rx, ry, 65535, scrcpy.ButtonPrimary, 0)
 			}
 		}
 	}
 }
 
-func (s *StateUI) img2tcell(img image.Image) {
-	if img == nil {
+func (s *StateUI) img2tcell(buf []byte) {
+	if !s.mutex.TryLock() {
 		return
 	}
 
-	screenBounds := img.Bounds()
+	defer s.mutex.Unlock()
+
+	img := image.NewNRGBA(image.Rect(0, 0, s.width, s.height))
+
+	for i := 0; i < s.width*s.height; i++ {
+		b := buf[3*i+0]
+		g := buf[3*i+1]
+		r := buf[3*i+2]
+
+		j := 4 * i
+		img.Pix[j+0] = r
+		img.Pix[j+1] = g
+		img.Pix[j+2] = b
+		img.Pix[j+3] = 0xff
+	}
+
 	converter := convert.NewImageConverter()
 	charMatrix := converter.Image2CharPixelMatrix(img, &convert.DefaultOptions)
 
@@ -151,16 +133,4 @@ func (s *StateUI) img2tcell(img image.Image) {
 	}
 
 	s.screen.Show()
-
-	s.endOfScreenY.Store(uint32(len(charMatrix)))
-	s.screenX.Store(uint32(screenBounds.Dx()))
-	s.screenY.Store(uint32(screenBounds.Dy()))
-}
-
-func (s *StateUI) event2tcell(ev string) {
-	for x, char := range ev {
-		color := tcell.NewRGBColor(int32(255), int32(0), int32(0))
-
-		s.screen.SetContent(x, int(s.endOfScreenY.Load())+1, char, nil, tcell.StyleDefault.Foreground(color))
-	}
 }
